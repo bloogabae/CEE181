@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>On-ramp bottleneck – interactive traffic simulation</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%9A%97%3C/text%3E%3C/svg%3E">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f5f6f8;--card:#fff;--fg:#1d2433;--mut:#5b6577;--line:#d7dbe3;--road:#3b4252;--mark:#e8ecf3;--zone:rgba(240,138,75,.2);--acc:#2f6fed;--grass:#e9efe6;--chart:#fafbfc}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151c;--card:#1b2029;--fg:#e8ecf3;--mut:#9aa4b6;--line:#2c3340;--road:#0d0f14;--mark:#6b7487;--zone:rgba(240,138,75,.25);--acc:#6c9bff;--grass:#18221a;--chart:#10131a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:1250px;margin:0 auto;padding:12px}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+h1{font-size:18px;margin:0}
+.btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+button{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.danger{border-color:#d9534f;color:#d9534f}
+button.on{background:#d9534f;color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+#cv{display:block;width:100%;height:300px;border-radius:8px}
+#cvZoom{display:block;width:100%;height:200px;border-radius:8px;margin-top:8px;border:1px solid var(--line)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.charts canvas{display:block;width:100%;height:230px;background:var(--chart);border:1px solid var(--line);border-radius:8px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}
+.stat span{display:block;color:var(--mut);font-size:12px}
+.stat b{font-size:16px;font-variant-numeric:tabular-nums}
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px 22px}
+.row{margin-bottom:8px}
+.row label{display:flex;justify-content:space-between;color:var(--mut);font-size:13px;align-items:center}
+.row output{color:var(--fg);font-weight:600}
+.row.c label,.row.s label{color:var(--fg)}
+.num-ctrl{display:inline-flex;align-items:center;gap:4px}
+.num-ctrl input[type=number]{width:82px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;text-align:right}
+.step-btn{padding:2px 7px;border-radius:5px;font-size:12px;line-height:1.2}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select{padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}
+.note{color:var(--mut);font-size:12px;margin:6px 2px 0}
+h2{font-size:12px;margin:0 0 6px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px}
+th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.param-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.pending-tag{color:#d97706;font-weight:600;font-size:12px;margin-left:auto}
+.seed-box{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12px}
+.seed-box input{width:95px;border:1px solid var(--line);border-radius:5px;padding:2px 5px;background:var(--card);color:var(--fg);font-family:monospace}
+.badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600;background:var(--bg);border:1px solid var(--line);margin-left:6px}
+.badge.on{background:rgba(34,197,94,.15);color:#16a34a;border-color:#22c55e}
+.badge.off{background:rgba(239,68,68,.12);color:#dc2626;border-color:#ef4444}
+.badge.cal{background:rgba(245,158,11,.15);color:#d97706;border-color:#f59e0b}
+.probe-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--mut)}
+.probe-bar select,.probe-bar input{font-size:12px;padding:3px 6px}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <h1>On-ramp bottleneck – interactive traffic simulation</h1>
+ <div class="btns">
+  <div class="seed-box" title="PRNG Seed for reproducible runs">
+   <span>Seed:</span>
+   <input type="number" id="seedInp" step="1">
+   <button id="bNewSeed" class="step-btn" title="Generate new random seed">🎲</button>
+  </div>
+  <button id="bPause" class="primary">Pause</button>
+  <button id="bReset">Reset</button>
+  <button id="bView">Zoom to merge</button>
+  <button id="bCrash" class="danger">Crash!</button>
+  <button id="bTab">Open in new tab ↗</button>
+ </div>
+</header>
+
+<div class="card">
+ <canvas id="cv"></canvas>
+ <h2 style="margin-top:10px">Zoomed Merge &amp; Corridor View (True 1:1 Vehicle Scale: Length × Width)</h2>
+ <canvas id="cvZoom"></canvas>
+ <p class="note" id="msg">One-directional highway with an on-ramp merging at 1750 m (250 m merge lane, no off-ramp). Top view draws cars ~3× longer than scale; zoomed view below is true 1:1 scale; colour shows speed. Crash! toggles a blockage near 2600 m.</p>
+</div>
+
+<div class="card"><div class="stats" id="stats"></div></div>
+
+<div class="card charts">
+ <div><h2>Time–space &amp; Shockwave Fronts (x vs time, 15-min window, colour = speed)</h2><canvas id="ts"></canvas></div>
+ <div><h2>Flow–density at 2250–3250 m (30 s samples vs IDM Equilibrium Curve)</h2><canvas id="fd"></canvas></div>
+</div>
+
+<div class="card charts">
+ <div>
+  <h2>Ramp Metering Figure 1: Occupancy vs Time <span id="meterBadge" class="badge off">Meter OFF</span></h2>
+  <canvas id="rm1"></canvas>
+ </div>
+ <div>
+  <h2>Ramp Metering Figure 2: Max Allowable Ramp Queue (n_max) &amp; Waiting Ramp Vehicles vs Time</h2>
+  <canvas id="rm2"></canvas>
+ </div>
+</div>
+
+<div class="card charts">
+ <div>
+  <h2>Sensor Audit: Loop Detector Measurements vs Ground Truth (60 s Intervals)</h2>
+  <canvas id="aud"></canvas>
+ </div>
+ <div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+   <h2 style="margin:0">Individual Vehicle Trajectory Probe (Gap, Speed, Acceleration)</h2>
+   <div class="probe-bar" style="margin:0">
+    <label>Vehicle ID: <select id="vehSelect"></select></label>
+    <button id="bPinVeh" class="step-btn" title="Track latest entering vehicle">Track Latest</button>
+   </div>
+  </div>
+  <canvas id="vehPlot"></canvas>
+ </div>
+</div>
+
+<div class="card">
+ <h2>IDM driver parameters – edit, then press Apply &amp; reset</h2>
+ <div class="tbl-wrap">
+  <table>
+   <thead>
+    <tr>
+     <th>Parameter</th>
+     <th>Symbol</th>
+     <th>Unit</th>
+     <th>Mean μ</th>
+     <th>Std dev σ</th>
+     <th>Min</th>
+     <th>Max</th>
+    </tr>
+   </thead>
+   <tbody id="paramBody"></tbody>
+  </table>
+ </div>
+ <p class="note">Each car draws aggressiveness <i>agg</i>, v₀, s₀, and b from a bounded normal distribution (mean μ, std dev σ, truncated to [min, max]). Aggressiveness maps T = T_max − agg·(T_max − T_min) and a = a_min + agg·(a_max − a_min) so more aggressive drivers accept shorter headways and accelerate faster. Set σ = 0 for identical drivers. Edits take effect on Reset.</p>
+ <div class="param-btns">
+  <button id="bApply" class="primary">Apply &amp; reset</button>
+  <button id="bIdentical">Identical drivers (σ = 0)</button>
+  <button id="bDefaults">Restore defaults</button>
+  <span class="pending-tag" id="pendingTag"></span>
+ </div>
+</div>
+
+<div class="card"><div class="groups" id="ctrl"></div></div>
+</main>
+
+<script>
+"use strict";
+
+// Constants (Section 3 & 4)
+const C = {
+ x0: 0,
+ xr0: 1350, // Ramp start & Sensor 1
+ xms: 1750, // Merge lane start & meter stop line
+ xme: 2000, // Merge lane end
+ xdens0: 2250, // Density window start
+ xdens1: 3250, // Density window end
+ xs: 2750, // Count station
+ xcrash: 2600, // Manual crash target
+ xsens2: 3500, // Marker node & Sensor 2 (~1 mile downstream of meter)
+ xend: 5250, // Mainline end
+ vehWidth: 2.0 // Standard vehicle width (m) for 1:1 true-scale zoomed view
+};
+
+// Default Driver & Global Parameters (Section 4.1 + Aggressiveness Index)
+const DEFAULT_DIST = {
+ agg: { label: "Aggressiveness index", symbol: "agg", unit: "–", mu: 0.50, sd: 0.10, min: 0.35, max: 0.65, step: 0.05 },
+ v0:  { label: "Desired speed", symbol: "v₀", unit: "km/h", mu: 120, sd: 12, min: 96, max: 144, step: 1 },
+ T:   { label: "Desired time gap (from agg)", symbol: "T", unit: "s", mu: 1.0, sd: 0.3, min: 0.5, max: 1.6, step: 0.05 },
+ s0:  { label: "Minimum gap", symbol: "s₀", unit: "m", mu: 2.0, sd: 0.45, min: 1.1, max: 2.9, step: 0.1 },
+ a:   { label: "Max acceleration (from agg)", symbol: "a", unit: "m/s²", mu: 1.0, sd: 0.35, min: 0.3, max: 1.7, step: 0.05 },
+ b:   { label: "Comfortable deceleration", symbol: "b", unit: "m/s²", mu: 1.5, sd: 0.4, min: 0.7, max: 2.3, step: 0.05 }
+};
+
+const DEFAULT_GLOB = {
+ delta: { label: "Acceleration exponent", symbol: "δ", unit: "–", val: 4.0, min: 1.0, max: 10.0, step: 0.5 },
+ len:   { label: "Vehicle length", symbol: "l", unit: "m", val: 5.0, min: 2.0, max: 15.0, step: 0.5 },
+ rcap:  { label: "Ramp speed limit", symbol: "v_ramp", unit: "km/h", val: 90, min: 30, max: 130, step: 5 }
+};
+
+let activeDist = JSON.parse(JSON.stringify(DEFAULT_DIST));
+let pendingDist = JSON.parse(JSON.stringify(DEFAULT_DIST));
+let activeGlob = JSON.parse(JSON.stringify(DEFAULT_GLOB));
+let pendingGlob = JSON.parse(JSON.stringify(DEFAULT_GLOB));
+
+// Live Scenario & Control Parameters (Section 4.2 + Constant Demand Default)
+const P = {
+ qin: 1700,
+ qr: 600,
+ bs: 2.0,
+ forced: 0,
+ meter: 0,
+ rate: 600,
+ ocrit: 22,
+ nmax: 57,
+ k0: 12,
+ speed: 8
+};
+
+const DEFS = [
+ ["Demand (Constant)", [
+  ["qin", "Mainline demand", "veh/h", 200, 2600, 50],
+  ["qr", "On-ramp demand", "veh/h", 0, 1200, 25]
+ ]],
+ ["Merge and ramp", [
+  ["bs", "Safe braking limit b_safe", "m/s²", 0.5, 4.0, 0.1],
+  ["forced", "Forced merge at end of merge lane", "chk"],
+  ["meter", "Dynamic ALINEA ramp meter", "chk"],
+  ["rate", "Base / max meter release rate", "veh/h", 240, 900, 30],
+  ["ocrit", "Max allowable occupancy (ALINEA)", "%", 5, 50, 1],
+  ["nmax", "Ramp storage cap n_max (ALINEA)", "veh", 5, 100, 1]
+ ]],
+ ["Run", [
+  ["k0", "Initial density (on Reset)", "veh/km/lane", 0, 30, 1],
+  ["speed", "Simulation speed", "×", 1, 30, 1]
+ ]]
+];
+
+const $ = id => document.getElementById(id);
+
+// Seeded PRNG (Mulberry32) so runs are reproducible and visible
+let currentSeed = Math.floor(Math.random() * 900000) + 100000;
+let rngState = currentSeed;
+$("seedInp").value = currentSeed;
+
+function setSeed(s) {
+ currentSeed = (Math.floor(Number(s)) || 123456) >>> 0;
+ $("seedInp").value = currentSeed;
+ rngState = currentSeed;
+}
+
+function rnd() {
+ let t = rngState += 0x6D2B79F5;
+ t = Math.imul(t ^ (t >>> 15), t | 1);
+ t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+ return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function gauss() {
+ let u = 0;
+ for (let i = 0; i < 6; i++) u += rnd();
+ return (u - 3) * 1.414;
+}
+
+function truncNormal(mean, sd, lo, hi) {
+ if (lo > hi) { const tmp = lo; lo = hi; hi = tmp; }
+ const clamp = x => Math.min(hi, Math.max(lo, x));
+ if (!(sd > 0)) return clamp(mean);
+ for (let i = 0; i < 50; i++) {
+  const x = mean + sd * gauss();
+  if (x >= lo && x <= hi) return x;
+ }
+ return clamp(mean);
+}
+
+// Build Driver Parameter Table with Increment/Decrement Buttons & Input Validation
+function renderParamTable() {
+ const tbody = $("paramBody");
+ tbody.innerHTML = "";
+
+ const makeNumControl = (val, step, min, max, onChange) => {
+  const wrap = document.createElement("div");
+  wrap.className = "num-ctrl";
+  const dec = document.createElement("button");
+  dec.type = "button";
+  dec.className = "step-btn";
+  dec.textContent = "−";
+  const inp = document.createElement("input");
+  inp.type = "number";
+  inp.step = step;
+  inp.value = Number(val.toFixed(4));
+  const inc = document.createElement("button");
+  inc.type = "button";
+  inc.className = "step-btn";
+  inc.textContent = "+";
+
+  const commit = newVal => {
+   let v = parseFloat(newVal);
+   if (isNaN(v)) v = val;
+   if (min !== undefined) v = Math.max(min, v);
+   if (max !== undefined) v = Math.min(max, v);
+   v = Math.round(v * 10000) / 10000;
+   inp.value = v;
+   onChange(v);
+   markPending();
+  };
+
+  dec.onclick = () => commit(parseFloat(inp.value) - step);
+  inc.onclick = () => commit(parseFloat(inp.value) + step);
+  inp.onchange = () => commit(inp.value);
+
+  wrap.append(dec, inp, inc);
+  return wrap;
+ };
+
+ for (const key of Object.keys(pendingDist)) {
+  const d = pendingDist[key];
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${d.label}</td><td>${d.symbol}</td><td>${d.unit}</td>`;
+  for (const field of ["mu", "sd", "min", "max"]) {
+   const td = document.createElement("td");
+   const floorVal = field === "sd" ? 0 : undefined;
+   td.appendChild(makeNumControl(d[field], d.step, floorVal, undefined, v => { d[field] = v; }));
+   tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+ }
+
+ for (const key of Object.keys(pendingGlob)) {
+  const gObj = pendingGlob[key];
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${gObj.label}</td><td>${gObj.symbol}</td><td>${gObj.unit}</td>`;
+  const tdVal = document.createElement("td");
+  tdVal.appendChild(makeNumControl(gObj.val, gObj.step, gObj.min, gObj.max, v => { gObj.val = v; }));
+  const tdNote = document.createElement("td");
+  tdNote.colSpan = 3;
+  tdNote.style.color = "var(--mut)";
+  tdNote.textContent = "single value for all cars";
+  tr.append(tdVal, tdNote);
+  tbody.appendChild(tr);
+ }
+}
+
+function markPending() {
+ $("pendingTag").textContent = "Changes pending – press Apply & reset";
+}
+
+function clearPending() {
+ $("pendingTag").textContent = "";
+}
+
+$("bApply").onclick = () => {
+ const oldGeomNmax = Math.floor((C.xms - C.xr0) / (activeGlob.len.val + activeDist.s0.mu));
+ activeDist = JSON.parse(JSON.stringify(pendingDist));
+ activeGlob = JSON.parse(JSON.stringify(pendingGlob));
+ const newGeomNmax = Math.floor((C.xms - C.xr0) / (activeGlob.len.val + activeDist.s0.mu));
+ if (P.nmax === oldGeomNmax && newGeomNmax !== oldGeomNmax) {
+  P.nmax = newGeomNmax;
+  if ($("n_nmax")) $("n_nmax").value = newGeomNmax;
+  if ($("r_nmax")) $("r_nmax").value = newGeomNmax;
+ }
+ clearPending();
+ reset();
+ $("msg").textContent = "Parameters applied and simulation reset.";
+};
+
+$("bIdentical").onclick = () => {
+ for (const k of Object.keys(pendingDist)) pendingDist[k].sd = 0;
+ renderParamTable();
+ markPending();
+};
+
+$("bDefaults").onclick = () => {
+ pendingDist = JSON.parse(JSON.stringify(DEFAULT_DIST));
+ pendingGlob = JSON.parse(JSON.stringify(DEFAULT_GLOB));
+ renderParamTable();
+ markPending();
+};
+
+// Build Scenario & Control Sliders/Inputs (supports both slider and direct numeric input for demands)
+for (const [gTitle, items] of DEFS) {
+ const d = document.createElement("div");
+ d.innerHTML = `<h2>${gTitle}</h2>`;
+ for (const it of items) {
+  const k = it[0], r = document.createElement("div");
+  r.className = "row";
+  if (it[2] === "chk") {
+   r.classList.add("c");
+   r.innerHTML = `<label><span>${it[1]}</span><input type="checkbox" id="s_${k}" ${P[k] ? "checked" : ""}></label>`;
+   r.querySelector("input").oninput = e => {
+    P[k] = e.target.checked ? 1 : 0;
+    if (k === "meter") updateMeterBadge();
+   };
+  } else {
+   r.innerHTML = `<label><span>${it[1]}</span><span class="num-ctrl"><input type="number" id="n_${k}" min="${it[3]}" max="${it[4]}" step="${it[5]}" value="${P[k]}" style="width:72px"><span>${it[2]}</span></span></label><input type="range" id="r_${k}" min="${it[3]}" max="${it[4]}" step="${it[5]}" value="${P[k]}">`;
+   const rng = r.querySelector("input[type=range]");
+   const num = r.querySelector("input[type=number]");
+   const sync = val => {
+    const parsed = Number(val);
+    let v = Math.max(it[3], Math.min(it[4], Number.isFinite(parsed) ? parsed : it[3]));
+    P[k] = v;
+    rng.value = v;
+    num.value = v;
+    if (k === "ocrit") {
+     ALINEA.o_crit = v / 100;
+     if (typeof drawMeterCharts === "function") drawMeterCharts();
+    } else if (k === "nmax") {
+     if (typeof drawMeterCharts === "function") drawMeterCharts();
+    }
+   };
+   rng.oninput = () => sync(rng.value);
+   num.onchange = () => sync(num.value);
+   num.oninput = () => {
+    const parsed = Number(num.value);
+    if (Number.isFinite(parsed) && parsed >= it[3] && parsed <= it[4]) {
+     P[k] = parsed;
+     rng.value = parsed;
+     if (k === "ocrit") {
+      ALINEA.o_crit = parsed / 100;
+      if (typeof drawMeterCharts === "function") drawMeterCharts();
+     } else if (k === "nmax") {
+      if (typeof drawMeterCharts === "function") drawMeterCharts();
+     }
+    }
+   };
+  }
+  d.appendChild(r);
+ }
+ $("ctrl").appendChild(d);
+}
+
+// 14 Statistics Tiles (Section 10.3)
+const SD = [
+ ["t", "Time"],
+ ["dm", "Demand (main + ramp)"],
+ ["n", "Cars on road"],
+ ["v", "Mean speed"],
+ ["q", "Downstream flow"],
+ ["rq", "Cars on ramp"],
+ ["uq", "Waiting to enter"],
+ ["mg", "Merges (forced)"],
+ ["cr", "Crashes"],
+ ["cl", "Decel clips"],
+ ["gap", "Min gap"],
+ ["vkt", "VKT"],
+ ["vht", "VHT"],
+ ["dl", "Delay"]
+];
+$("stats").innerHTML = SD.map(([k, l]) => `<div class="stat"><span>${l}</span><b id="st_${k}">–</b></div>`).join("");
+
+// ---------- Simulation Model ----------
+let t, L0, R, arr, pend, ev, exits, cnt, tok, G = true, S, manual, paused = false, full = true;
+let nextFD, nextTS, tsWin;
+let fdPoints = [];
+let nextVehId = 1;
+let trackedVehId = null;
+let autoTrackLatest = true;
+const vehTraces = new Map(); // id -> { id, origin, agg, v0, T, a, pts: [{t, x, gap, speed, acc}] }
+
+// Sensor & ALINEA Ramp Metering State (Section 8.2)
+const SENS_LEN = 2.0; // inductive loop detector physical length (m)
+const ALINEA = {
+ Kr: 70, // Regulator gain (veh/h)
+ o_crit: 0.22, // Target/critical occupancy (22%)
+ calTime: 900, // 15 minutes calibration period (900 s)
+ interval: 60, // 60 s control update interval
+ nextUpdate: 60,
+ s1_occTime: 0, // Sensor 1 (x = 1350 m) occupied time in current 60 s interval
+ s1_speedSum: 0,
+ s1_count: 0,
+ s2_occTime: 0, // Sensor 2 (x = 3500 m) occupied time in current 60 s interval
+ s2_speedSum: 0,
+ s2_count: 0,
+ s2_truthSpeedSum: 0,
+ s2_truthSamples: 0,
+ lastOcc1: 0,
+ lastOcc2: 0,
+ lastFlow1: 0,
+ lastSpeed1: 0,
+ lastFlow2: 0,
+ lastSpeed2: 0,
+ qr_cmd: 600, // Commanded metering rate (veh/h)
+ overridden: false, // Queue override active when ramp backs up to entry (x = 1350 m)
+ history: [], // Time-series history for Figure 1 & Figure 2
+ auditHistory: [] // Sensor 2 measured flow/speed vs simulation ground truth
+};
+
+function updateMeterBadge() {
+ const b = $("meterBadge");
+ if (!b) return;
+ if (!P.meter) {
+  b.className = "badge off";
+  b.textContent = "Meter OFF";
+ } else if (ALINEA.overridden) {
+  b.className = "badge off";
+  b.textContent = "Spillback Override (Flush)";
+ } else if (t < ALINEA.calTime) {
+  b.className = "badge cal";
+  b.textContent = `Calibrating (${Math.max(0, Math.ceil((ALINEA.calTime - t) / 60))}m left)`;
+ } else {
+  b.className = "badge on";
+  b.textContent = `ALINEA Active (${Math.round(ALINEA.qr_cmd)} veh/h)`;
+ }
+}
+
+function mkVehicle(origin = "M") {
+ const D = activeDist;
+ // Aggressiveness index drawn from bounded normal distribution [min, max]
+ const agg = truncNormal(D.agg.mu, D.agg.sd, D.agg.min, D.agg.max);
+ // Normalize aggressiveness onto [0, 1] across [D.agg.min, D.agg.max]
+ const aggSpan = Math.max(1e-6, D.agg.max - D.agg.min);
+ const aggNorm = Math.min(1, Math.max(0, (agg - D.agg.min) / aggSpan));
+
+ const v0 = Math.max(0.5, truncNormal(D.v0.mu, D.v0.sd, D.v0.min, D.v0.max) / 3.6);
+ // Higher aggressiveness -> shorter desired time gap T and higher max acceleration a
+ const T  = Math.max(0.05, D.T.max - aggNorm * (D.T.max - D.T.min));
+ const s0 = Math.max(0.1, truncNormal(D.s0.mu, D.s0.sd, D.s0.min, D.s0.max));
+ const a  = Math.max(0.05, D.a.min + aggNorm * (D.a.max - D.a.min));
+ const b  = Math.max(0.05, truncNormal(D.b.mu, D.b.sd, D.b.min, D.b.max));
+
+ const id = nextVehId++;
+ return { id, origin, x: 0, xp: 0, v: 0, acc: 0, gap: null, v0, T, s0, a, b, agg, crashed: 0, ev: null };
+}
+
+function idm(w, v, s, dv, v0e) {
+ if (s < 0.01) s = 0.01;
+ const delta = activeGlob.delta.val;
+ const s_star = w.s0 + Math.max(0, v * w.T + (v * dv) / (2 * Math.sqrt(w.a * w.b)));
+ return w.a * (1 - Math.pow(v / v0e, delta) - Math.pow(s_star / s, 2));
+}
+
+function freeAccel(w, v0e) {
+ const delta = activeGlob.delta.val;
+ return w.a * (1 - Math.pow(w.v / v0e, delta));
+}
+
+function safeGap(w, vf, vl) {
+ const v0 = w.v0;
+ let lo = 0.01, hi = 2000;
+ if (idm(w, vf, lo, vf - vl, v0) >= -P.bs) return lo;
+ for (let i = 0; i < 30; i++) {
+  const mid = (lo + hi) / 2;
+  if (idm(w, vf, mid, vf - vl, v0) < -P.bs) lo = mid;
+  else hi = mid;
+ }
+ return hi;
+}
+
+// Constant demand (time-based demand removed per report)
+const qIn = () => P.qin;
+const qR = () => P.qr;
+
+function headway(rate) {
+ if (rate <= 0) return 1e9;
+ const m = 3600 / rate;
+ if (m <= 0.8) return m;
+ return 0.8 + (-Math.log(1 - rnd())) * (m - 0.8);
+}
+
+function arrive(A, rate) {
+ if (A.next - t > 5 * Math.max(3600 / Math.max(rate, 1), 2)) {
+  A.next = t + headway(rate);
+ }
+ while (A.next <= t) {
+  A.q += 1;
+  A.next += headway(rate);
+ }
+}
+
+function registerVehicleTrace(v) {
+ if (vehTraces.size > 40) {
+  const oldestKey = vehTraces.keys().next().value;
+  if (oldestKey !== trackedVehId) vehTraces.delete(oldestKey);
+ }
+ vehTraces.set(v.id, {
+  id: v.id,
+  origin: v.origin,
+  agg: v.agg,
+  v0: v.v0,
+  T: v.T,
+  a: v.a,
+  pts: []
+ });
+ if (autoTrackLatest || trackedVehId === null) {
+  trackedVehId = v.id;
+ }
+ refreshVehDropdown();
+}
+
+function refreshVehDropdown() {
+ const sel = $("vehSelect");
+ if (!sel) return;
+ const ids = Array.from(vehTraces.keys());
+ sel.innerHTML = ids.map(id => {
+  const tr = vehTraces.get(id);
+  return `<option value="${id}" ${id === trackedVehId ? "selected" : ""}>#${id} (${tr.origin === "R" ? "Ramp" : "Main"}, agg=${tr.agg.toFixed(2)})</option>`;
+ }).join("");
+}
+
+function reset() {
+ setSeed($("seedInp").value);
+ t = 0;
+ L0 = [];
+ R = [];
+ arr = { m: { next: 0, q: 0 }, r: { next: 0, q: 0 } };
+ pend = { m: null, r: null };
+ ev = [];
+ exits = [];
+ cnt = 0;
+ tok = 1;
+ G = true;
+ manual = null;
+ S = { merges: 0, forced: 0, crashes: 0, clips: 0, vkt: 0, vht: 0, mg: 1e9 };
+ nextFD = 30;
+ nextTS = 0;
+ tsWin = 0;
+ fdPoints = [];
+ nextVehId = 1;
+ trackedVehId = null;
+ autoTrackLatest = true;
+ vehTraces.clear();
+
+ // Reset ALINEA & Sensors
+ ALINEA.nextUpdate = ALINEA.interval;
+ ALINEA.s1_occTime = 0;
+ ALINEA.s1_speedSum = 0;
+ ALINEA.s1_count = 0;
+ ALINEA.s2_occTime = 0;
+ ALINEA.s2_speedSum = 0;
+ ALINEA.s2_count = 0;
+ ALINEA.s2_truthSpeedSum = 0;
+ ALINEA.s2_truthSamples = 0;
+ ALINEA.lastOcc1 = 0;
+ ALINEA.lastOcc2 = 0;
+ ALINEA.lastFlow1 = 0;
+ ALINEA.lastSpeed1 = 0;
+ ALINEA.lastFlow2 = 0;
+ ALINEA.lastSpeed2 = 0;
+ ALINEA.o_crit = P.ocrit / 100;
+ ALINEA.qr_cmd = P.rate;
+ ALINEA.overridden = false;
+ ALINEA.history = [];
+ ALINEA.auditHistory = [];
+
+ if (P.k0 > 0) {
+  const sp = 1000 / P.k0;
+  for (let x = C.xend - sp / 2; x > 0; x -= sp) {
+   const v = mkVehicle("M");
+   v.x = v.xp = x;
+   v.v = Math.min(95 / 3.6, 0.9 * v.v0);
+   L0.push(v);
+  }
+  if (L0.length > 0) {
+   registerVehicleTrace(L0[L0.length - 1]);
+  }
+ }
+
+ $("bCrash").textContent = "Crash!";
+ $("bCrash").classList.remove("on");
+ updateMeterBadge();
+ clearCharts();
+ draw();
+ stats();
+}
+
+function insertMain() {
+ const A = arr.m;
+ const len = activeGlob.len.val;
+ while (A.q > 0) {
+  const v = pend.m || (pend.m = mkVehicle("M"));
+  const last = L0[L0.length - 1];
+  let vi = v.v0;
+  if (last) {
+   const s = last.x - len - C.x0;
+   vi = Math.min(last.v, 0.98 * v.v0);
+   if (s < v.s0 + 1 || idm(v, vi, s, vi - last.v, v.v0) < -0.8) break;
+  }
+  v.x = v.xp = C.x0;
+  v.v = vi;
+  L0.push(v);
+  registerVehicleTrace(v);
+  pend.m = null;
+  A.q -= 1;
+ }
+}
+
+function insertRamp() {
+ const A = arr.r;
+ const len = activeGlob.len.val;
+ const rcap = activeGlob.rcap.val / 3.6;
+ while (A.q > 0) {
+  const v = pend.r || (pend.r = mkVehicle("R"));
+  const last = R[R.length - 1];
+  const v0_eff = Math.min(v.v0, rcap);
+  let vi = v0_eff;
+  if (last) {
+   const s = last.x - len - C.xr0;
+   vi = Math.min(last.v, 0.98 * v0_eff);
+   if (s < v.s0 + 1 || idm(v, vi, s, vi - last.v, v0_eff) < -0.8) break;
+  }
+  v.x = v.xp = C.xr0;
+  v.v = vi;
+  R.push(v);
+  registerVehicleTrace(v);
+  pend.r = null;
+  A.q -= 1;
+ }
+}
+
+function crashVeh(list, evt) {
+ for (const v of list) {
+  if (!v.crashed) {
+   v.crashed = 1;
+   v.v = 0;
+   v.acc = 0;
+   v.ev = evt;
+   evt.vs.push(v);
+  }
+ }
+}
+
+function clearEvents() {
+ for (const e of ev) {
+  if (t >= e.end) {
+   for (const v of e.vs) {
+    const i = L0.indexOf(v);
+    if (i >= 0) L0.splice(i, 1);
+    const j = R.indexOf(v);
+    if (j >= 0) R.splice(j, 1);
+   }
+   e.done = 1;
+  }
+ }
+ ev = ev.filter(e => !e.done);
+}
+
+function toggleCrash() {
+ const b = $("bCrash");
+ if (manual) {
+  manual.end = 0;
+  clearEvents();
+  manual = null;
+  b.textContent = "Crash!";
+  b.classList.remove("on");
+  $("msg").textContent = "Crash cleared – traffic resumes.";
+  return;
+ }
+ let best = -1;
+ for (let i = 0; i < L0.length; i++) {
+  if (!L0[i].crashed && (best < 0 || Math.abs(L0[i].x - C.xcrash) < Math.abs(L0[best].x - C.xcrash))) {
+   best = i;
+  }
+ }
+ if (best < 0) return;
+ const len = activeGlob.len.val;
+ const e = { vs: [], end: Infinity };
+ const grp = [L0[best]];
+ if (L0[best + 1] && (L0[best].x - len - L0[best + 1].x) < 60) {
+  L0[best + 1].x = L0[best].x - len - 0.05;
+  grp.push(L0[best + 1]);
+ }
+ crashVeh(grp, e);
+ ev.push(e);
+ manual = e;
+ S.crashes++;
+ b.textContent = "Clear crash";
+ b.classList.add("on");
+ $("msg").textContent = "Collision at " + Math.round(L0[best].x) + " m – lane blocked until cleared.";
+}
+
+// Sensor Crossing & Occupancy Accumulator (Section 8.2)
+function accumulateSensors(dt) {
+ const len = activeGlob.len.val;
+ // Sensor 1 at xr0 = 1350 m (on-ramp entry detector)
+ for (const v of R) {
+  const rear = v.x - len;
+  const front = v.x;
+  const overlap = Math.max(0, Math.min(front, C.xr0 + SENS_LEN) - Math.max(rear, C.xr0));
+  if (overlap > 0) {
+   ALINEA.s1_occTime += dt * (overlap / SENS_LEN);
+  }
+  if (v.xp < C.xr0 && v.x >= C.xr0) {
+   ALINEA.s1_count++;
+   ALINEA.s1_speedSum += v.v;
+  }
+ }
+ // Sensor 2 at xsens2 = 3500 m (mainline downstream detector, ~1 mile downstream of meter)
+ for (const v of L0) {
+  const rear = v.x - len;
+  const front = v.x;
+  const overlap = Math.max(0, Math.min(front, C.xsens2 + SENS_LEN) - Math.max(rear, C.xsens2));
+  if (overlap > 0) {
+   ALINEA.s2_occTime += dt * (overlap / SENS_LEN);
+  }
+  if (v.xp < C.xsens2 && v.x >= C.xsens2) {
+   ALINEA.s2_count++;
+   ALINEA.s2_speedSum += v.v;
+  }
+  if (v.x >= C.xsens2 - 250 && v.x <= C.xsens2 + 250) {
+   ALINEA.s2_truthSpeedSum += v.v;
+   ALINEA.s2_truthSamples++;
+  }
+ }
+}
+
+function updateSensorsAndMeter() {
+ if (t < ALINEA.nextUpdate) return;
+ const iv = ALINEA.interval;
+ const occ1 = Math.min(1, ALINEA.s1_occTime / iv);
+ const occ2 = Math.min(1, ALINEA.s2_occTime / iv);
+ const flow1 = ALINEA.s1_count * (3600 / iv);
+ const spd1 = ALINEA.s1_count > 0 ? (ALINEA.s1_speedSum / ALINEA.s1_count) : 0;
+ const flow2 = ALINEA.s2_count * (3600 / iv);
+ const spd2 = ALINEA.s2_count > 0 ? (ALINEA.s2_speedSum / ALINEA.s2_count) : 0;
+ const truthSpd2 = ALINEA.s2_truthSamples > 0 ? (ALINEA.s2_truthSpeedSum / ALINEA.s2_truthSamples) : spd2;
+
+ ALINEA.lastOcc1 = occ1;
+ ALINEA.lastOcc2 = occ2;
+ ALINEA.lastFlow1 = flow1;
+ ALINEA.lastSpeed1 = spd1;
+ ALINEA.lastFlow2 = flow2;
+ ALINEA.lastSpeed2 = spd2;
+
+ // Check if ramp backup reaches storage cap n_max / Sensor 1 entry
+ ALINEA.o_crit = P.ocrit / 100;
+ const rampQueueVehicles = R.filter(v => v.x < C.xms).length;
+ const n_max = Math.max(1, Math.round(P.nmax));
+ const backupAtEntry = (rampQueueVehicles >= n_max - 1) || (occ1 > 0.65 && spd1 < 1.5);
+
+ if (!P.meter) {
+  ALINEA.qr_cmd = P.rate;
+  ALINEA.overridden = false;
+ } else if (t < ALINEA.calTime) {
+  // 15-minute sensor calibration period: hold base meter release rate
+  ALINEA.qr_cmd = P.rate;
+  ALINEA.overridden = false;
+ } else {
+  // Active ALINEA feedback law after 15-min calibration
+  if (backupAtEntry) {
+   // Deactivate metering restriction when ramp queue backs up to Sensor 1 entry
+   ALINEA.overridden = true;
+   ALINEA.qr_cmd = 1800; // flush queue
+  } else {
+   ALINEA.overridden = false;
+   // q_r(k) = q_r(k-1) + K_r * (o_crit - o_out(k-1))
+   const basePrev = Math.min(ALINEA.qr_cmd, P.rate);
+   const nextRate = basePrev + ALINEA.Kr * ((ALINEA.o_crit - occ2) * 100);
+   ALINEA.qr_cmd = Math.max(180, Math.min(P.rate, nextRate));
+  }
+ }
+
+ updateMeterBadge();
+
+ // Record point for Ramp Metering Figures 1 & 2
+ const controlledOcc = P.meter ? Math.min(ALINEA.o_crit, occ2) : occ2;
+ ALINEA.history.push({
+  t: t,
+  o_max: ALINEA.o_crit * 100,
+  o_dem: occ2 * 100,
+  o_ctrl: controlledOcc * 100,
+  n_max: n_max,
+  n_wait: rampQueueVehicles + arr.r.q
+ });
+
+ // Record point for Sensor Audit Figure (Sensor 2 vs Simulation Ground Truth)
+ ALINEA.auditHistory.push({
+  t: t,
+  sensFlow: flow2,
+  truthDemand: qIn() + qR(),
+  sensSpdKmh: spd2 * 3.6,
+  truthSpdKmh: truthSpd2 * 3.6
+ });
+
+ // Reset interval accumulators
+ ALINEA.s1_occTime = 0;
+ ALINEA.s1_speedSum = 0;
+ ALINEA.s1_count = 0;
+ ALINEA.s2_occTime = 0;
+ ALINEA.s2_speedSum = 0;
+ ALINEA.s2_count = 0;
+ ALINEA.s2_truthSpeedSum = 0;
+ ALINEA.s2_truthSamples = 0;
+ ALINEA.nextUpdate += iv;
+ drawMeterCharts();
+ drawAuditChart();
+}
+
+// Single 1 s Simulation Step (Section 10.1)
+function step(dt) {
+ // 1. t += dt
+ t += dt;
+
+ // 2. Arrival clocks, insert mainline, insert ramp, clear finished crash events
+ arrive(arr.m, qIn());
+ arrive(arr.r, qR());
+ insertMain();
+ insertRamp();
+ clearEvents();
+
+ // 3. Update meter tokens and signal G
+ const effectiveMeterRate = (P.meter && !ALINEA.overridden) ? ALINEA.qr_cmd : 1800;
+ if (P.meter && !ALINEA.overridden) {
+  tok = Math.min(1, tok + (effectiveMeterRate / 3600) * dt);
+  G = tok >= 1;
+ } else {
+  tok = 1;
+  G = true;
+ }
+ if (t % 5 === 0) updateMeterBadge();
+
+ // 4. Sort all lists by decreasing x
+ L0.sort((a, b) => b.x - a.x);
+ R.sort((a, b) => b.x - a.x);
+
+ const len = activeGlob.len.val;
+ const rcap = activeGlob.rcap.val / 3.6;
+
+ // 5. Compute accelerations for mainline, then ramp (Section 8.1)
+ // Mainline vehicles strictly follow their own mainline leader (no stopping/yielding for unmerged ramp vehicles)
+ for (let i = 0; i < L0.length; i++) {
+  const v = L0[i];
+  if (v.crashed) { v.acc = 0; v.gap = 0.05; continue; }
+  const p = L0[i - 1];
+  v.gap = p ? Math.max(0.01, p.x - len - v.x) : null;
+  v.acc = p ? idm(v, v.v, v.gap, v.v - p.v, v.v0) : freeAccel(v, v.v0);
+ }
+
+ for (let i = 0; i < R.length; i++) {
+  const v = R[i];
+  if (v.crashed) { v.acc = 0; v.gap = 0.05; continue; }
+  const v0e = v.x >= C.xms ? v.v0 : Math.min(v.v0, rcap);
+  let a = freeAccel(v, v0e);
+  v.gap = i > 0 ? Math.max(0.01, R[i - 1].x - len - v.x) : (v.x < C.xme ? Math.max(0.5, C.xme - v.x) : null);
+
+  // Rule 1: Ramp leader
+  if (i > 0) {
+   const p = R[i - 1];
+   a = Math.min(a, idm(v, v.v, p.x - len - v.x, v.v - p.v, v0e));
+  }
+  // Rule 2: Meter stop line (dilemma-zone rule)
+  if (!G && v.x < C.xms) {
+   const as = idm(v, v.v, C.xms - v.x, v.v, v0e);
+   if (as >= -1.5 * P.bs || v.v < 1) {
+    a = Math.min(a, as);
+   }
+  }
+  // Rule 3: Merge-lane gap alignment & rolling hold near end of merge lane
+  if (v.x >= C.xms) {
+   let j = 0;
+   while (j < L0.length && L0[j].x > v.x) j++;
+   const gLead = L0[j - 1];
+   const gFoll = L0[j];
+   const sl = gLead ? gLead.x - len - v.x : 1e9;
+   const sf = gFoll ? v.x - len - gFoll.x : 1e9;
+
+   // Check if an acceptable gap exists right now
+   const canMergeNow = (!gFoll || sf > safeGap(gFoll, gFoll.v, v.v)) && (!gLead || sl > safeGap(v, v.v, gLead.v));
+
+   if (canMergeNow) {
+    // Gap is acceptable: match leader speed safely and maintain acceleration to merge smoothly
+    if (gLead && sl > 0) {
+     a = Math.min(a, Math.max(idm(v, v.v, sl, v.v - gLead.v, v0e), -P.bs));
+    }
+   } else {
+    // No acceptable gap yet: pace traffic along the merge lane and hold a rolling wait (min ~2.5 m/s) near xme until a gap opens
+    const distToEnd = Math.max(0.5, C.xme - v.x);
+    if (distToEnd < 90) {
+     // Smoothly decelerate toward a rolling wait speed (~2.5 m/s = 9 km/h) instead of stopping dead at 0 m/s
+     const crawlSpeed = distToEnd < 12 ? 1.2 : 2.8;
+     const vTarget = Math.min(v0e, crawlSpeed + (distToEnd / 90) * 14);
+     const aHold = (vTarget - v.v) * 0.9;
+     a = Math.min(a, Math.max(aHold, -v.b * 1.4));
+    } else if (gLead && sl > 0) {
+     // Early/mid merge lane: gently match mainline platoon speed while scanning for a gap
+     a = Math.min(a, Math.max(idm(v, v.v, sl, v.v - gLead.v, v0e), -2.0));
+    }
+   }
+  }
+  v.acc = a;
+ }
+
+ // 6. Integrate all vehicles (Section 7.2) with strict collision-free following distance enforcement
+ let nv = 0;
+ for (const list of [L0, R]) {
+  for (let idx = 0; idx < list.length; idx++) {
+   const v = list[idx];
+   nv++;
+   S.vkt += (v.v * dt) / 1000;
+   if (v.crashed) continue;
+   let a = v.acc;
+   if (a < -9) {
+    a = -9;
+    S.clips++;
+   }
+   let vn = v.v + a * dt;
+   let dx;
+   if (vn < 0) {
+    dx = a < 0 ? (v.v * v.v) / (2 * (-a)) : 0;
+    vn = 0;
+   } else {
+    dx = 0.5 * (v.v + vn) * dt;
+   }
+   v.xp = v.x;
+   v.x += dx;
+   v.v = vn;
+
+   // Keep unmerged ramp vehicles strictly within the merge lane while preserving rolling momentum (no dead stop)
+   if (list === R && v.x > C.xme - 0.5) {
+    v.x = C.xme - 0.5;
+    v.v = Math.min(v.v, 2.5);
+   }
+
+   // Enforce non-overlapping minimum safe bumper gap so automatic crashes never occur
+   if (idx > 0) {
+    const leader = list[idx - 1];
+    const minAllowedGap = leader.crashed ? 0.5 : Math.max(0.5, v.s0 * 0.5);
+    const maxAllowedX = leader.x - len - minAllowedGap;
+    if (v.x > maxAllowedX) {
+     v.x = Math.max(v.xp, maxAllowedX);
+     v.v = Math.min(v.v, leader.v);
+    }
+    v.gap = Math.max(0.01, leader.x - len - v.x);
+   }
+
+   if (list === L0 && v.xp < C.xs && v.x >= C.xs) cnt++;
+   if (list === R && P.meter && !ALINEA.overridden && v.xp < C.xms && v.x >= C.xms) {
+    tok -= 1;
+   }
+
+   // Record individual trajectory telemetry (gap, speed, acceleration)
+   const tr = vehTraces.get(v.id);
+   if (tr) {
+    tr.pts.push({
+     t: t,
+     x: v.x,
+     gap: v.gap !== null ? Math.min(150, v.gap) : 150,
+     speedKmh: v.v * 3.6,
+     acc: a
+    });
+   }
+  }
+ }
+ S.vht += (nv * dt) / 3600;
+
+ // Sensor accumulation & ALINEA update
+ accumulateSensors(dt);
+ updateSensorsAndMeter();
+
+ // 7. Remove mainline vehicles with x >= xend and record exit time
+ for (let i = L0.length - 1; i >= 0; i--) {
+  if (L0[i].x >= C.xend) {
+   L0.splice(i, 1);
+   exits.push(t);
+  }
+ }
+ while (exits.length && exits[0] < t - 60) exits.shift();
+
+ // 8. Merge decisions (Section 8.4): ramp vehicles wait until acceptable gap opens, then merge cleanly
+ for (let i = 0; i < R.length; i++) {
+  const v = R[i];
+  if (v.crashed || v.x < C.xms) continue;
+  let j = 0;
+  while (j < L0.length && L0[j].x > v.x) j++;
+  const A = L0[j - 1];
+  const F = L0[j];
+  const sl = A ? A.x - len - v.x : 1e9;
+  const sf = F ? v.x - len - F.x : 1e9;
+
+  // Acceptable gap check using projected post-merge speed so mainline followers never have to slam their brakes
+  const mergeSpeed = A ? Math.min(v.v0, Math.max(v.v, A.v * 0.92)) : (F ? Math.min(v.v0, Math.max(v.v, F.v * 0.95)) : v.v);
+  const minClearance = Math.max(v.s0, 1.5);
+  const followerSafe = !F || (sf > Math.max(minClearance, safeGap(F, F.v, mergeSpeed)));
+  const leaderSafe   = !A || (sl > Math.max(minClearance, safeGap(v, mergeSpeed, A.v)));
+  let ok = followerSafe && leaderSafe;
+  let forcedMerge = false;
+
+  if (!ok && P.forced && v.x >= C.xme - 10 && sf > 2.0 && sl > 2.0) {
+   ok = true;
+   forcedMerge = true;
+  }
+  if (ok) {
+   v.v = mergeSpeed;
+   R.splice(i, 1);
+   L0.splice(j, 0, v);
+   i--;
+   S.merges++;
+   if (forcedMerge) S.forced++;
+  }
+ }
+
+ // 9. Minimum gap tracking (automatic collisions disabled; only manual Crash! blocks the lane)
+ for (const list of [L0, R]) {
+  for (let i = 1; i < list.length; i++) {
+   const p = list[i - 1], v = list[i];
+   const g = p.x - len - v.x;
+   if (!v.crashed && g > 0) {
+    S.mg = Math.min(S.mg, g);
+   }
+  }
+ }
+
+ // 10. Update chart data (Section 12)
+ charts();
+}
+
+// ---------- Analytical IDM Equilibrium Flow-Density Curve ----------
+function computeIDMEquilibriumCurve() {
+ const D = activeDist;
+ const v0 = D.v0.mu / 3.6;
+ const T = D.T.mu;
+ const s0 = D.s0.mu;
+ const delta = activeGlob.delta.val;
+ const len = activeGlob.len.val;
+ const pts = [];
+ // Sweep equilibrium speed v from 0 to v0
+ const steps = 120;
+ for (let i = 0; i <= steps; i++) {
+  const v = (i / steps) * (v0 * 0.999);
+  const ratio = Math.pow(v / v0, delta);
+  const denom = Math.sqrt(Math.max(1e-6, 1 - ratio));
+  const s_eq = (s0 + v * T) / denom;
+  const k = 1000 / (s_eq + len); // veh/km/lane
+  const q = k * (v * 3.6); // veh/h/lane
+  if (k <= 140) {
+   pts.push({ k, q });
+  }
+ }
+ return pts;
+}
+
+// ---------- Charts (Section 12.2, 12.3, Ramp Metering Figures 1 & 2, Audit & Vehicle Probe) ----------
+const ts = $("ts"), fd = $("fd"), rm1 = $("rm1"), rm2 = $("rm2"), aud = $("aud"), vehPlot = $("vehPlot");
+const tg = ts.getContext("2d"), fg = fd.getContext("2d"), g1 = rm1.getContext("2d"), g2 = rm2.getContext("2d"), gaud = aud.getContext("2d"), gveh = vehPlot.getContext("2d");
+let cs = {};
+
+function sizeChart(c) {
+ const r = devicePixelRatio || 1;
+ const cw = c.clientWidth || 560;
+ const ch = c.clientHeight || 230;
+ c.width = cw * r;
+ c.height = ch * r;
+}
+
+function drawFDBackground() {
+ const r = devicePixelRatio || 1;
+ const mut = cs.getPropertyValue("--mut").trim() || "#5b6577";
+ const line = cs.getPropertyValue("--line").trim() || "#d7dbe3";
+
+ fg.clearRect(0, 0, fd.width, fd.height);
+ fg.strokeStyle = line;
+ fg.lineWidth = 1;
+ for (let i = 1; i <= 4; i++) {
+  const y = fd.height * (i / 5);
+  fg.beginPath(); fg.moveTo(0, y); fg.lineTo(fd.width, y); fg.stroke();
+  const x = fd.width * (i / 5);
+  fg.beginPath(); fg.moveTo(x, 0); fg.lineTo(x, fd.height); fg.stroke();
+ }
+
+ // Analytical IDM Equilibrium Fundamental Diagram Curve
+ const eqPts = computeIDMEquilibriumCurve();
+ if (eqPts.length > 1) {
+  fg.save();
+  fg.strokeStyle = "#ef4444";
+  fg.lineWidth = 2 * r;
+  fg.setLineDash([5 * r, 3 * r]);
+  fg.beginPath();
+  eqPts.forEach((pt, idx) => {
+   const px = (pt.k / 140) * fd.width;
+   const py = fd.height - (pt.q / 2600) * fd.height;
+   if (idx === 0) fg.moveTo(px, py);
+   else fg.lineTo(px, py);
+  });
+  fg.stroke();
+  fg.restore();
+ }
+
+ fg.fillStyle = mut;
+ fg.font = (11 * r) + "px system-ui";
+ fg.fillText("flow [veh/h/lane] ↑ density [veh/km/lane] → (0–140, 0–2600)", 8 * r, 14 * r);
+ fg.fillStyle = "#ef4444";
+ fg.fillText("-- IDM Equilibrium Curve", 8 * r, 28 * r);
+ fg.fillStyle = cs.getPropertyValue("--acc").trim() || "#2f6fed";
+ fg.fillText("● Simulated 30s Samples", 155 * r, 28 * r);
+
+ if (Array.isArray(fdPoints)) {
+  fg.fillStyle = cs.getPropertyValue("--acc").trim() || "#2f6fed";
+  for (const pt of fdPoints) {
+   fg.beginPath();
+   fg.arc((pt.k / 140) * fd.width, fd.height - (pt.q / 2600) * fd.height, 3 * r, 0, Math.PI * 2);
+   fg.fill();
+  }
+ }
+}
+
+function clearCharts() {
+ for (const c of [ts, fd, rm1, rm2, aud, vehPlot]) sizeChart(c);
+ cs = getComputedStyle(document.documentElement);
+ const r = devicePixelRatio || 1;
+ const mut = cs.getPropertyValue("--mut").trim();
+
+ // Time-Space + Shockwave Axis Labels
+ tg.fillStyle = mut;
+ tg.font = (11 * r) + "px system-ui";
+ tg.fillText("x [m] ↑ (0–5250 m)  t mod 900 [s] →  |  Magenta contour = Shockwave front (v < 35 km/h)", 8 * r, 14 * r);
+
+ // Flow-Density Axis Labels, Equilibrium Curve & Grid
+ drawFDBackground();
+ drawMeterCharts();
+ drawAuditChart();
+ drawVehicleProbeChart();
+}
+
+function charts() {
+ const w = ts.width, h = ts.height, r = devicePixelRatio || 1;
+ const meanV0 = activeDist.v0.mu;
+
+ if (t >= nextTS) {
+  nextTS = t + 2;
+  const win = Math.floor(t / 900);
+  if (win !== tsWin) {
+   tsWin = win;
+   tg.clearRect(0, 0, w, h);
+   tg.fillStyle = cs.getPropertyValue("--mut").trim();
+   tg.font = (11 * r) + "px system-ui";
+   tg.fillText(`x [m] ↑ (0–5250 m)  t mod 900 [s] → (Window ${win + 1}) | Magenta = Shockwave front (<35 km/h)`, 8 * r, 14 * r);
+  }
+  const px = ((t % 900) / 900) * w;
+
+  // Track congested shockwave front (upstream-most and downstream-most vehicles below 35 km/h)
+  let minShockX = Infinity, maxShockX = -Infinity;
+  for (const v of L0) {
+   const vKmh = v.v * 3.6;
+   tg.fillStyle = v.crashed ? "#e5322d" : `hsl(${Math.round(120 * Math.min(1, vKmh / meanV0))},70%,45%)`;
+   tg.fillRect(px, h - (v.x / C.xend) * h, 2 * r, 2 * r);
+   if (vKmh < 35) {
+    if (v.x < minShockX) minShockX = v.x;
+    if (v.x > maxShockX) maxShockX = v.x;
+   }
+  }
+  // Highlight shockwave tail & head propagation boundaries
+  if (minShockX < Infinity) {
+   tg.fillStyle = "#d946ef";
+   tg.fillRect(px, h - (minShockX / C.xend) * h - 1 * r, 2.5 * r, 2.5 * r);
+   tg.fillRect(px, h - (maxShockX / C.xend) * h - 1 * r, 2.5 * r, 2.5 * r);
+  }
+ }
+
+ if (t >= nextFD) {
+  nextFD += 30;
+  let k = 0;
+  for (const v of L0) {
+   if (v.x >= C.xdens0 && v.x < C.xdens1) k++;
+  }
+  const q = (cnt / 30) * 3600;
+  cnt = 0;
+  fdPoints.push({ k, q });
+  drawFDBackground();
+ }
+}
+
+function drawMeterCharts() {
+ const r = devicePixelRatio || 1;
+ const mut = cs.getPropertyValue("--mut").trim() || "#5b6577";
+ const line = cs.getPropertyValue("--line").trim() || "#d7dbe3";
+ const padL = 38 * r, padR = 12 * r, padT = 26 * r, padB = 22 * r;
+
+ // --- Figure 1: Occupancy vs Time ---
+ g1.clearRect(0, 0, rm1.width, rm1.height);
+ const w1 = rm1.width - padL - padR, h1 = rm1.height - padT - padB;
+ g1.strokeStyle = line;
+ g1.lineWidth = 1;
+ g1.strokeRect(padL, padT, w1, h1);
+
+ g1.font = (10 * r) + "px system-ui";
+ g1.fillStyle = "#e5322d"; g1.fillRect(padL, 8 * r, 10 * r, 3 * r);
+ g1.fillStyle = mut; g1.fillText("Max Allowable Occ (%)", padL + 14 * r, 13 * r);
+ g1.fillStyle = "#f59e0b"; g1.fillRect(padL + 135 * r, 8 * r, 10 * r, 3 * r);
+ g1.fillStyle = mut; g1.fillText("Demand Occ (%)", padL + 149 * r, 13 * r);
+ g1.fillStyle = "#2f6fed"; g1.fillRect(padL + 240 * r, 8 * r, 10 * r, 3 * r);
+ g1.fillStyle = mut; g1.fillText("Controlled Occ (%)", padL + 254 * r, 13 * r);
+
+ g1.fillText("50%", 6 * r, padT + 6 * r);
+ g1.fillText("25%", 6 * r, padT + h1 / 2 + 4 * r);
+ g1.fillText("0%", 12 * r, padT + h1);
+
+ const hist = ALINEA.history;
+ const maxT = Math.max(900, hist.length ? hist[hist.length - 1].t : 900);
+ g1.fillText(`Time: 0 to ${Math.round(maxT)} s (15-min cal @ 900s)`, padL, rm1.height - 5 * r);
+
+ const calX = padL + (900 / maxT) * w1;
+ g1.strokeStyle = "#9aa4b6";
+ g1.setLineDash([4 * r, 4 * r]);
+ g1.beginPath(); g1.moveTo(calX, padT); g1.lineTo(calX, padT + h1); g1.stroke();
+ g1.setLineDash([]);
+
+ if (hist.length > 0) {
+  const plotLine = (key, color, dash = []) => {
+   g1.strokeStyle = color;
+   g1.lineWidth = 2 * r;
+   g1.setLineDash(dash);
+   g1.beginPath();
+   hist.forEach((pt, idx) => {
+    const px = padL + (pt.t / maxT) * w1;
+    const py = padT + h1 - (Math.min(50, pt[key]) / 50) * h1;
+    if (idx === 0) g1.moveTo(px, py); else g1.lineTo(px, py);
+   });
+   g1.stroke();
+   g1.setLineDash([]);
+  };
+  plotLine("o_max", "#e5322d", [5 * r, 3 * r]);
+  plotLine("o_dem", "#f59e0b");
+  plotLine("o_ctrl", "#2f6fed");
+ }
+
+ // --- Figure 2: n_max & Waiting Vehicles vs Time ---
+ g2.clearRect(0, 0, rm2.width, rm2.height);
+ const w2 = rm2.width - padL - padR, h2 = rm2.height - padT - padB;
+ g2.strokeStyle = line;
+ g2.lineWidth = 1;
+ g2.strokeRect(padL, padT, w2, h2);
+
+ g2.fillStyle = "#10b981"; g2.fillRect(padL, 8 * r, 10 * r, 3 * r);
+ g2.fillStyle = mut; g2.fillText("n_max (Ramp Storage Cap)", padL + 14 * r, 13 * r);
+ g2.fillStyle = "#8b5cf6"; g2.fillRect(padL + 165 * r, 8 * r, 10 * r, 3 * r);
+ g2.fillStyle = mut; g2.fillText("Waiting Ramp Vehicles", padL + 179 * r, 13 * r);
+
+ const peakN = hist.reduce((m, pt) => Math.max(m, pt.n_max, pt.n_wait), Math.max(60, P.nmax));
+ const yMax2 = Math.max(80, Math.ceil(peakN / 10) * 10);
+ g2.fillText(String(yMax2), 10 * r, padT + 6 * r);
+ g2.fillText(String(yMax2 / 2), 10 * r, padT + h2 / 2 + 4 * r);
+ g2.fillText("0", 16 * r, padT + h2);
+ g2.fillText(`Time: 0 to ${Math.round(maxT)} s`, padL, rm2.height - 5 * r);
+
+ if (hist.length > 0) {
+  const plotLine2 = (key, color, dash = []) => {
+   g2.strokeStyle = color;
+   g2.lineWidth = 2 * r;
+   g2.setLineDash(dash);
+   g2.beginPath();
+   hist.forEach((pt, idx) => {
+    const px = padL + (pt.t / maxT) * w2;
+    const py = padT + h2 - (Math.min(yMax2, pt[key]) / yMax2) * h2;
+    if (idx === 0) g2.moveTo(px, py); else g2.lineTo(px, py);
+   });
+   g2.stroke();
+   g2.setLineDash([]);
+  };
+  plotLine2("n_max", "#10b981", [5 * r, 3 * r]);
+  plotLine2("n_wait", "#8b5cf6");
+ }
+}
+
+// --- Audit Chart: Sensor 2 Data vs Simulation Ground Truth ---
+function drawAuditChart() {
+ const r = devicePixelRatio || 1;
+ const mut = cs.getPropertyValue("--mut").trim() || "#5b6577";
+ const line = cs.getPropertyValue("--line").trim() || "#d7dbe3";
+ const padL = 42 * r, padR = 38 * r, padT = 26 * r, padB = 22 * r;
+
+ gaud.clearRect(0, 0, aud.width, aud.height);
+ const w = aud.width - padL - padR, h = aud.height - padT - padB;
+ gaud.strokeStyle = line;
+ gaud.lineWidth = 1;
+ gaud.strokeRect(padL, padT, w, h);
+
+ gaud.font = (10 * r) + "px system-ui";
+ gaud.fillStyle = "#2f6fed"; gaud.fillRect(padL, 8 * r, 10 * r, 3 * r);
+ gaud.fillStyle = mut; gaud.fillText("Sensor 2 Flow (veh/h)", padL + 14 * r, 13 * r);
+ gaud.fillStyle = "#94a3b8"; gaud.fillRect(padL + 135 * r, 8 * r, 10 * r, 3 * r);
+ gaud.fillStyle = mut; gaud.fillText("Total Demand", padL + 149 * r, 13 * r);
+ gaud.fillStyle = "#10b981"; gaud.fillRect(padL + 230 * r, 8 * r, 10 * r, 3 * r);
+ gaud.fillStyle = mut; gaud.fillText("Sensor 2 Spd (km/h)", padL + 244 * r, 13 * r);
+ gaud.fillStyle = "#f59e0b"; gaud.fillRect(padL + 355 * r, 8 * r, 10 * r, 3 * r);
+ gaud.fillStyle = mut; gaud.fillText("Sim Truth Spd", padL + 369 * r, 13 * r);
+
+ gaud.fillText("2800", 6 * r, padT + 6 * r);
+ gaud.fillText("1400", 6 * r, padT + h / 2 + 4 * r);
+ gaud.fillText("0", 18 * r, padT + h);
+ gaud.fillText("140 km/h", aud.width - 36 * r, padT + 6 * r);
+ gaud.fillText("70", aud.width - 28 * r, padT + h / 2 + 4 * r);
+ gaud.fillText("0", aud.width - 24 * r, padT + h);
+
+ const hist = ALINEA.auditHistory;
+ const maxT = Math.max(600, hist.length ? hist[hist.length - 1].t : 600);
+ gaud.fillText(`Time: 0 to ${Math.round(maxT)} s (Sensor 2 @ 3500 m vs Ground Truth)`, padL, aud.height - 5 * r);
+
+ if (hist.length > 0) {
+  const plotAudit = (key, maxVal, color, dash = []) => {
+   gaud.strokeStyle = color;
+   gaud.lineWidth = 2 * r;
+   gaud.setLineDash(dash);
+   gaud.beginPath();
+   hist.forEach((pt, idx) => {
+    const px = padL + (pt.t / maxT) * w;
+    const py = padT + h - (Math.min(maxVal, Math.max(0, pt[key])) / maxVal) * h;
+    if (idx === 0) gaud.moveTo(px, py); else gaud.lineTo(px, py);
+   });
+   gaud.stroke();
+   gaud.setLineDash([]);
+  };
+  plotAudit("truthDemand", 2800, "#94a3b8", [4 * r, 3 * r]);
+  plotAudit("sensFlow", 2800, "#2f6fed");
+  plotAudit("truthSpdKmh", 140, "#f59e0b", [4 * r, 3 * r]);
+  plotAudit("sensSpdKmh", 140, "#10b981");
+ }
+}
+
+// --- Individual Vehicle Probe Chart (Gap, Speed, Acceleration) ---
+function drawVehicleProbeChart() {
+ const r = devicePixelRatio || 1;
+ const mut = cs.getPropertyValue("--mut").trim() || "#5b6577";
+ const line = cs.getPropertyValue("--line").trim() || "#d7dbe3";
+ const padL = 38 * r, padR = 12 * r, padT = 26 * r, padB = 22 * r;
+
+ gveh.clearRect(0, 0, vehPlot.width, vehPlot.height);
+ const w = vehPlot.width - padL - padR, h = vehPlot.height - padT - padB;
+ gveh.strokeStyle = line;
+ gveh.lineWidth = 1;
+ gveh.strokeRect(padL, padT, w, h);
+
+ gveh.font = (10 * r) + "px system-ui";
+ gveh.fillStyle = "#2f6fed"; gveh.fillRect(padL, 8 * r, 10 * r, 3 * r);
+ gveh.fillStyle = mut; gveh.fillText("Speed (0–150 km/h)", padL + 14 * r, 13 * r);
+ gveh.fillStyle = "#10b981"; gveh.fillRect(padL + 125 * r, 8 * r, 10 * r, 3 * r);
+ gveh.fillStyle = mut; gveh.fillText("Gap (0–150 m)", padL + 139 * r, 13 * r);
+ gveh.fillStyle = "#ef4444"; gveh.fillRect(padL + 225 * r, 8 * r, 10 * r, 3 * r);
+ gveh.fillStyle = mut; gveh.fillText("Accel (-9 to +3 m/s²)", padL + 239 * r, 13 * r);
+
+ gveh.fillText("150", 10 * r, padT + 6 * r);
+ gveh.fillText("75", 14 * r, padT + h / 2 + 4 * r);
+ gveh.fillText("0", 18 * r, padT + h);
+
+ const tr = vehTraces.get(trackedVehId);
+ if (!tr || tr.pts.length === 0) {
+  gveh.fillText("Waiting for vehicle telemetry...", padL + 10 * r, padT + h / 2);
+  return;
+ }
+
+ const pts = tr.pts;
+ const t0 = pts[0].t;
+ const t1 = Math.max(t0 + 30, pts[pts.length - 1].t);
+ const lastPt = pts[pts.length - 1];
+ gveh.fillText(`Veh #${tr.id} (${tr.origin === "R" ? "Ramp" : "Main"}, agg=${tr.agg.toFixed(2)}, T=${tr.T.toFixed(2)}s, a=${tr.a.toFixed(2)}m/s²) | Now: v=${lastPt.speedKmh.toFixed(1)} km/h, s=${lastPt.gap.toFixed(1)} m, a=${lastPt.acc.toFixed(2)} m/s²`, padL, vehPlot.height - 5 * r);
+
+ const plotSeries = (fnY, color) => {
+  gveh.strokeStyle = color;
+  gveh.lineWidth = 2 * r;
+  gveh.beginPath();
+  pts.forEach((pt, idx) => {
+   const px = padL + ((pt.t - t0) / (t1 - t0)) * w;
+   const py = padT + h - Math.min(1, Math.max(0, fnY(pt))) * h;
+   if (idx === 0) gveh.moveTo(px, py); else gveh.lineTo(px, py);
+  });
+  gveh.stroke();
+ };
+
+ plotSeries(pt => pt.speedKmh / 150, "#2f6fed");
+ plotSeries(pt => pt.gap / 150, "#10b981");
+ plotSeries(pt => (pt.acc + 9) / 12, "#ef4444");
+}
+
+// ---------- Road Canvases (Main Overview & True 1:1 Scale Zoomed Corridor View) ----------
+const cv = $("cv"), g = cv.getContext("2d");
+const cvZoom = $("cvZoom"), gz = cvZoom.getContext("2d");
+let W = 0, H = 0, Wz = 0, Hz = 0, col = {};
+
+function readCol() {
+ cs = getComputedStyle(document.documentElement);
+ for (const k of ["road", "mark", "zone", "fg", "mut", "grass"]) {
+  col[k] = cs.getPropertyValue("--" + k).trim();
+ }
+}
+
+function resize() {
+ const r = devicePixelRatio || 1;
+ W = cv.clientWidth;
+ H = cv.clientHeight;
+ cv.width = W * r;
+ cv.height = H * r;
+ g.setTransform(r, 0, 0, r, 0, 0);
+
+ Wz = cvZoom.clientWidth;
+ Hz = cvZoom.clientHeight;
+ cvZoom.width = Wz * r;
+ cvZoom.height = Hz * r;
+ gz.setTransform(r, 0, 0, r, 0, 0);
+
+ readCol();
+ clearCharts();
+ draw();
+}
+
+addEventListener("resize", resize);
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change", () => setTimeout(() => { readCol(); clearCharts(); draw(); }, 50));
+
+function drawDetectorIcon(ctx, xPx, yPx, label, sublabel) {
+ ctx.save();
+ // High-contrast inductive loop detector icon (amber/cyan double-wire coil + roadway lead-in)
+ ctx.fillStyle = "rgba(14, 165, 233, 0.28)";
+ ctx.strokeStyle = "#0ea5e9";
+ ctx.lineWidth = 2.2;
+ const boxW = 14;
+ const boxH = 22;
+ ctx.beginPath();
+ ctx.roundRect(xPx - boxW / 2, yPx - boxH / 2, boxW, boxH, 3);
+ ctx.fill();
+ ctx.stroke();
+
+ // Inner figure-8 / dual loop wires
+ ctx.strokeStyle = "#facc15";
+ ctx.lineWidth = 1.4;
+ ctx.strokeRect(xPx - 4, yPx - 7, 8, 5);
+ ctx.strokeRect(xPx - 4, yPx + 2, 8, 5);
+
+ // Callout badge above sensor
+ ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+ ctx.beginPath();
+ ctx.roundRect(xPx - 32, yPx - boxH / 2 - 26, 64, 22, 4);
+ ctx.fill();
+
+ ctx.fillStyle = "#38bdf8";
+ ctx.font = "bold 10px system-ui,sans-serif";
+ ctx.textAlign = "center";
+ ctx.fillText(label, xPx, yPx - boxH / 2 - 15);
+ if (sublabel) {
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "9px system-ui,sans-serif";
+  ctx.fillText(sublabel, xPx, yPx - boxH / 2 - 6);
+ }
+ ctx.restore();
+}
+
+function drawSignalIcon(ctx, xPx, yPx, isGreen) {
+ ctx.save();
+ // Signal pole
+ ctx.strokeStyle = "#64748b";
+ ctx.lineWidth = 2.5;
+ ctx.beginPath();
+ ctx.moveTo(xPx, yPx - 22);
+ ctx.lineTo(xPx, yPx + 16);
+ ctx.stroke();
+
+ // Signal housing box
+ ctx.fillStyle = "#0f172a";
+ ctx.strokeStyle = "#cbd5e1";
+ ctx.lineWidth = 1.5;
+ ctx.beginPath();
+ ctx.roundRect(xPx - 8, yPx - 16, 16, 32, 5);
+ ctx.fill();
+ ctx.stroke();
+
+ // Red top lamp
+ ctx.fillStyle = !isGreen ? "#ef4444" : "#3f1515";
+ ctx.beginPath();
+ ctx.arc(xPx, yPx - 7, 4.8, 0, Math.PI * 2);
+ ctx.fill();
+ if (!isGreen) {
+  ctx.shadowColor = "#ef4444";
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+ }
+
+ // Green bottom lamp
+ ctx.fillStyle = isGreen ? "#22c55e" : "#12301d";
+ ctx.beginPath();
+ ctx.arc(xPx, yPx + 7, 4.8, 0, Math.PI * 2);
+ ctx.fill();
+ if (isGreen) {
+  ctx.shadowColor = "#22c55e";
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+ }
+
+ // Status pill next to signal
+ ctx.fillStyle = isGreen ? "#16a34a" : "#dc2626";
+ ctx.font = "bold 9px system-ui,sans-serif";
+ ctx.textAlign = "center";
+ ctx.fillText(P.meter ? (isGreen ? "GO" : "STOP") : "OPEN", xPx, yPx + 26);
+ ctx.restore();
+}
+
+function drawRoadScene(ctx, width, height, x0, x1, trueScale) {
+ const sx = width / (x1 - x0);
+ const X = x => (x - x0) * sx;
+ const len = activeGlob.len.val;
+ const meanV0 = activeDist.v0.mu;
+
+ const lw = trueScale ? Math.max(14, 3.7 * sx) : Math.max(11, Math.min(26, sx * 26));
+ const yM = height * 0.48;
+ const yR = yM + lw;
+ const dy = trueScale ? Math.min(height * 0.34, 65) : Math.min(height * 0.36, 105);
+
+ ctx.fillStyle = col.grass;
+ ctx.fillRect(0, 0, width, height);
+
+ ctx.lineCap = "butt";
+ ctx.lineJoin = "miter";
+ ctx.strokeStyle = col.road;
+ ctx.lineWidth = lw + 0.6;
+
+ // Mainline
+ ctx.beginPath();
+ ctx.moveTo(X(0), yM);
+ ctx.lineTo(X(C.xend), yM);
+ ctx.stroke();
+
+ // On-ramp & Merge lane
+ ctx.beginPath();
+ ctx.moveTo(X(C.xr0), yR + dy);
+ ctx.lineTo(X(C.xms), yR);
+ ctx.lineTo(X(C.xme), yR);
+ ctx.stroke();
+
+ // Merge zone highlight
+ ctx.fillStyle = col.zone;
+ ctx.fillRect(X(C.xms), yM - lw / 2, X(C.xme) - X(C.xms), lw * 2);
+
+ // Dashed lane lines
+ ctx.strokeStyle = col.mark;
+ ctx.lineWidth = 1;
+ ctx.setLineDash([8, 10]);
+ ctx.beginPath();
+ ctx.moveTo(X(0), yM - lw / 2);
+ ctx.lineTo(X(C.xend), yM - lw / 2);
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.moveTo(X(C.xms), yM + lw / 2);
+ ctx.lineTo(X(C.xme), yM + lw / 2);
+ ctx.stroke();
+ ctx.setLineDash([]);
+
+ // End of merge lane red line
+ ctx.strokeStyle = "#e5322d";
+ ctx.lineWidth = 2;
+ ctx.beginPath();
+ ctx.moveTo(X(C.xme), yR - lw / 2);
+ ctx.lineTo(X(C.xme), yR + lw / 2);
+ ctx.stroke();
+
+ // Grey square nodes
+ ctx.fillStyle = "#9aa4b6";
+ for (const x of [0, C.xms, C.xme, C.xsens2, C.xend]) {
+  ctx.fillRect(X(x) - 4, yM - 4, 8, 8);
+ }
+ ctx.fillRect(X(C.xr0) - 4, yR + dy - 4, 8, 8);
+
+ // Detector loop icons at Sensor 1 (xr0 = 1350 m) and Sensor 2 (3500 m, ~1 mile downstream of meter)
+ drawDetectorIcon(ctx, X(C.xr0), yR + dy, "Sensor 1", `Occ ${(ALINEA.lastOcc1 * 100).toFixed(0)}%`);
+ drawDetectorIcon(ctx, X(C.xsens2), yM, "Sensor 2", `Occ ${(ALINEA.lastOcc2 * 100).toFixed(0)}%`);
+
+ // Clear dual-lamp Traffic Control Ramp Signal Icon (switches red <-> green)
+ drawSignalIcon(ctx, X(C.xms) - 12, yR + lw / 2 + 18, G);
+
+ // Segment labels
+ ctx.fillStyle = col.mut;
+ ctx.font = "11px system-ui,sans-serif";
+ ctx.textAlign = "center";
+ const yT = yM - lw / 2 - 10;
+ ctx.fillText("Highway 1750 m", X(875), yT);
+ ctx.fillText("Merge 250 m", X(1875), yT);
+ ctx.fillText("Highway 1500 m", X(2750), yT);
+ ctx.fillText("Highway 1750 m", X(4375), yT);
+ ctx.fillText("On-ramp 400 m", X(C.xr0) + 45, yR + dy + 22);
+
+ // Distance axis ticks
+ const st = trueScale ? 50 : (full ? 500 : 100);
+ for (let x = Math.ceil(Math.max(0, x0) / st) * st; x <= x1; x += st) {
+  ctx.fillRect(X(x), height - 16, 1, 5);
+  ctx.fillText(x + " m", X(x), height - 4);
+ }
+
+ // Vehicle dimensions: top canvas is ~3x longer than scale; zoomed canvas is true 1:1 scale (length x width)
+ const cl = trueScale ? Math.max(3, len * sx) : Math.max(7, len * sx * 3);
+ const ch = trueScale ? Math.max(2.5, C.vehWidth * sx) : Math.max(5, lw * 0.45);
+
+ const drawCar = (v, y, ang) => {
+  ctx.save();
+  ctx.translate(X(v.x), y);
+  ctx.rotate(ang);
+  ctx.fillStyle = v.crashed ? "#e5322d" : `hsl(${Math.round(120 * Math.min(1, (v.v * 3.6) / meanV0))},70%,45%)`;
+  ctx.beginPath();
+  ctx.roundRect(-cl, -ch / 2, cl, ch, trueScale ? 1 : 2);
+  ctx.fill();
+
+  // Highlight tracked vehicle with a crisp ring
+  if (v.id === trackedVehId) {
+   ctx.strokeStyle = "#facc15";
+   ctx.lineWidth = 2;
+   ctx.strokeRect(-cl - 2, -ch / 2 - 2, cl + 4, ch + 4);
+  }
+
+  if (v.crashed) {
+   ctx.strokeStyle = "#fff";
+   ctx.lineWidth = 1.5;
+   ctx.beginPath();
+   ctx.moveTo(-cl / 2 - 3, -3);
+   ctx.lineTo(-cl / 2 + 3, 3);
+   ctx.moveTo(-cl / 2 + 3, -3);
+   ctx.lineTo(-cl / 2 - 3, 3);
+   ctx.stroke();
+  }
+  ctx.restore();
+ };
+
+ if (Array.isArray(L0)) {
+  for (const v of L0) {
+   if (v.x > x0 - 20 && v.x < x1 + 20) drawCar(v, yM, 0);
+  }
+ }
+ if (Array.isArray(R)) {
+  const ang = Math.atan2(-dy, (C.xms - C.xr0) * sx);
+  for (const v of R) {
+   if (v.x < x0 - 20 || v.x > x1 + 20) continue;
+   if (v.x >= C.xms) drawCar(v, yR, 0);
+   else drawCar(v, yR + (dy * (C.xms - v.x)) / (C.xms - C.xr0), ang);
+  }
+ }
+}
+
+function draw() {
+ if (!W || !H || cv.clientWidth !== W) {
+  const r = devicePixelRatio || 1;
+  if (cv.clientWidth > 0 && cv.clientHeight > 0) {
+   W = cv.clientWidth; H = cv.clientHeight;
+   cv.width = W * r; cv.height = H * r;
+   g.setTransform(r, 0, 0, r, 0, 0);
+  }
+  if (cvZoom.clientWidth > 0 && cvZoom.clientHeight > 0) {
+   Wz = cvZoom.clientWidth; Hz = cvZoom.clientHeight;
+   cvZoom.width = Wz * r; cvZoom.height = Hz * r;
+   gz.setTransform(r, 0, 0, r, 0, 0);
+  }
+ }
+ if (!W || !H) return;
+ // Top Canvas: Full road (-60 to 5310 m) or Zoomed (1050 to 2700 m)
+ const [x0, x1] = full ? [-60, C.xend + 60] : [1050, 2700];
+ drawRoadScene(g, W, H, x0, x1, false);
+
+ // Second Canvas: Dedicated Zoomed Corridor View (1300 to 2150 m) with 1:1 true-scale cars
+ if (Wz > 0 && Hz > 0) {
+  drawRoadScene(gz, Wz, Hz, 1300, 2150, true);
+ }
+}
+
+// ---------- Animation & Frame Loop (Section 10.2, dt = 1 s) ----------
+let last = performance.now(), acc = 0, sa = 0;
+
+function frame(now) {
+ const dtReal = Math.min(0.1, (now - last) / 1000);
+ last = now;
+
+ if (!paused) {
+  acc += dtReal * P.speed;
+  let k = 0;
+  while (acc >= 1.0 && k < 150) {
+   step(1.0);
+   acc -= 1.0;
+   k++;
+  }
+  if (k === 150) acc = 0;
+ }
+
+ draw();
+ sa += dtReal;
+ if (sa >= 0.25) {
+  sa = 0;
+  stats();
+  drawVehicleProbeChart();
+ }
+ requestAnimationFrame(frame);
+}
+
+function stats() {
+ let sv = 0, c = 0;
+ for (const v of L0) {
+  sv += v.v;
+  c++;
+ }
+ const meanV0 = activeDist.v0.mu;
+ const dl = S.vht - S.vkt / meanV0;
+ const o = {
+  t: Math.floor(t) + " s",
+  dm: Math.round(qIn()) + " + " + Math.round(qR()) + " veh/h",
+  n: c + R.length,
+  v: (c ? (sv / c) * 3.6 : 0).toFixed(0) + " km/h",
+  q: Math.round(exits.length * 60) + " veh/h",
+  rq: R.length,
+  uq: arr.m.q + arr.r.q,
+  mg: S.merges + " (" + S.forced + ")",
+  cr: S.crashes,
+  cl: S.clips,
+  gap: S.mg > 1e8 ? "–" : S.mg.toFixed(1) + " m",
+  vkt: S.vkt.toFixed(0) + " km",
+  vht: S.vht.toFixed(1) + " h",
+  dl: dl.toFixed(1) + " veh·h"
+ };
+ for (const k in o) {
+  $("st_" + k).textContent = o[k];
+ }
+}
+
+// UI Button Handlers (Section 11.3)
+$("bNewSeed").onclick = () => {
+ const s = Math.floor(Math.random() * 900000) + 100000;
+ $("seedInp").value = s;
+ reset();
+ $("msg").textContent = `New seed ${s} applied and simulation reset.`;
+};
+
+$("seedInp").onchange = () => {
+ reset();
+ $("msg").textContent = `Seed ${$("seedInp").value} applied and simulation reset.`;
+};
+
+$("vehSelect").onchange = e => {
+ trackedVehId = Number(e.target.value);
+ autoTrackLatest = false;
+ drawVehicleProbeChart();
+};
+
+$("bPinVeh").onclick = () => {
+ autoTrackLatest = true;
+ const keys = Array.from(vehTraces.keys());
+ if (keys.length) {
+  trackedVehId = keys[keys.length - 1];
+  refreshVehDropdown();
+  drawVehicleProbeChart();
+ }
+};
+
+$("bPause").onclick = e => {
+ paused = !paused;
+ e.target.textContent = paused ? "Resume" : "Pause";
+};
+
+$("bReset").onclick = () => {
+ activeDist = JSON.parse(JSON.stringify(pendingDist));
+ activeGlob = JSON.parse(JSON.stringify(pendingGlob));
+ clearPending();
+ reset();
+ $("msg").textContent = "Reset – current parameter inputs applied.";
+};
+
+$("bView").onclick = e => {
+ full = !full;
+ e.target.textContent = full ? "Zoom to merge" : "Show full road";
+ draw();
+};
+
+$("bCrash").onclick = toggleCrash;
+
+$("bTab").onclick = () => {
+ const u = URL.createObjectURL(new Blob(["<!DOCTYPE html>\n" + document.documentElement.outerHTML], { type: "text/html" }));
+ if (!window.open(u, "_blank")) {
+  const a = document.createElement("a");
+  a.href = u;
+  a.download = "onramp_sim.html";
+  a.click();
+  $("msg").textContent = "Pop-ups are blocked here, so the file was downloaded as onramp_sim.html.";
+ }
+};
+
+addEventListener("keydown", e => {
+ if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+ if (e.key === "c" || e.key === "C") toggleCrash();
+ if (e.key === " ") {
+  e.preventDefault();
+  $("bPause").click();
+ }
+});
+
+// Initialize safely after DOM layout
+function init() {
+ renderParamTable();
+ reset();
+ resize();
+ requestAnimationFrame(frame);
+}
+if (document.readyState === "loading") {
+ document.addEventListener("DOMContentLoaded", init);
+} else {
+ init();
+}
+window.addEventListener("load", () => {
+ resize();
+});
+</script>
+</body>
+</html>
